@@ -1,0 +1,20 @@
+from fastapi import FastAPI
+from database import DB_NAME
+{%- for table in tables %}
+from routers import {{ table.name.lower() }}
+{%- endfor %}
+
+app = FastAPI()
+
+# Include routers
+{%- for table in tables %}
+app.include_router({{ table.name.lower() }}.router)
+{%- endfor %}
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the API"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

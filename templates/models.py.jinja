@@ -1,0 +1,19 @@
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+
+{% for table in tables -%}
+class {{ table.name | capitalize }}Base(BaseModel):
+    {% for column in table.columns -%}
+    {% if column.name != table.primary_key -%}
+    {{ column.name }}: {% if column.nullable %}Optional[{{ column.py_type }}]{% else %}{{ column.py_type }}{% endif %}{% if column.nullable %} = None{% endif %}
+    {% endif -%}
+    {% endfor %}
+
+class {{ table.name | capitalize }}Create({{ table.name | capitalize }}Base):
+    pass
+
+class {{ table.name | capitalize }}({{ table.name | capitalize }}Base):
+    {{ table.primary_key }}: int
+
+{% endfor %}

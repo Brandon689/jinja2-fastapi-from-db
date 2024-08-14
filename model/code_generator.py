@@ -1,87 +1,10 @@
-import os
+import sqlite3
+import re
 from jinja2 import Environment, FileSystemLoader
 
 class CodeGenerator:
     def __init__(self):
         self.env = Environment(loader=FileSystemLoader('templates'))
-        self.template_string = """
-import sqlite3
-from fastapi import FastAPI, HTTPException, Query, Depends
-from typing import List, Optional
-from pydantic import BaseModel
-from datetime import datetime
-
-app = FastAPI()
-
-DB_NAME = "{{ db_name }}"
-
-def execute_query(query: str, params: tuple = ()) -> List[dict]:
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute(query, params)
-    result = [dict(row) for row in cursor.fetchall()]
-    conn.commit()
-    conn.close()
-    return result
-
-{% for table in tables %}
-class {{ table.name | capitalize }}Base(BaseModel):
-    {% for column in table.columns %}{% if column.name != table.primary_key %}{{ column.name }}: {{ column.py_type }}{% if column.nullable %} = None{% endif %}
-    {% endif %}{% endfor %}
-
-class {{ table.name | capitalize }}Create({{ table.name | capitalize }}Base):
-    pass
-
-class {{ table.name | capitalize }}({{ table.name | capitalize }}Base):
-    {{ table.primary_key }}: int
-
-@app.get("/{{ table.name | lower }}", response_model=List[{{ table.name | capitalize }}])
-async def get_{{ table.name | lower }}(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    sort_by: Optional[str] = None,
-    order: Optional[str] = Query(None, pattern="^(asc|desc)$")
-):
-    query = "SELECT * FROM {{ table.name }}"
-    if sort_by:
-        query += f" ORDER BY {sort_by}"
-        if order:
-            query += f" {order.upper()}"
-    query += " LIMIT ? OFFSET ?"
-    return execute_query(query, (limit, skip))
-
-@app.get("/{{ table.name | lower }}/{item_id}", response_model={{ table.name | capitalize }})
-async def get_{{ table.name | lower }}_item(item_id: int):
-    query = "SELECT * FROM {{ table.name }} WHERE {{ table.primary_key }} = ?"
-    result = execute_query(query, (item_id,))
-    if not result:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return result[0]
-
-@app.post("/{{ table.name | lower }}", response_model={{ table.name | capitalize }})
-async def create_{{ table.name | lower }}(item: {{ table.name | capitalize }}Create):
-    columns = ", ".join(item.dict().keys())
-    placeholders = ", ".join("?" * len(item.dict()))
-    query = f"INSERT INTO {{ table.name }} ({columns}) VALUES ({placeholders})"
-    execute_query(query, tuple(item.dict().values()))
-    return {**item.dict(), "{{ table.primary_key }}": execute_query("SELECT last_insert_rowid()")[0]['last_insert_rowid()']}
-
-@app.put("/{{ table.name | lower }}/{item_id}", response_model={{ table.name | capitalize }})
-async def update_{{ table.name | lower }}(item_id: int, item: {{ table.name | capitalize }}Create):
-    set_clause = ", ".join(f"{k} = ?" for k in item.dict().keys())
-    query = f"UPDATE {{ table.name }} SET {set_clause} WHERE {{ table.primary_key }} = ?"
-    values = tuple(item.dict().values()) + (item_id,)
-    execute_query(query, values)
-    return {**item.dict(), "{{ table.primary_key }}": item_id}
-
-@app.delete("/{{ table.name | lower }}/{item_id}")
-async def delete_{{ table.name | lower }}(item_id: int):
-    query = "DELETE FROM {{ table.name }} WHERE {{ table.primary_key }} = ?"
-    execute_query(query, (item_id,))
-    return {"message": "Item deleted successfully"}
-{% endfor %}"""
-        self.template = Template(self.template_string)
 
     def get_db_schema(self, db_path):
         conn = sqlite3.connect(db_path)
@@ -142,7 +65,7 @@ async def delete_{{ table.name | lower }}(item_id: int):
         schema = self.get_db_schema(db_path)
         
         generated_files = {
-            'main.py': self.env.get_template('main.py.jinja').render(db_name=db_path),
+            'main.py': self.env.get_template('main.py.jinja').render(tables=schema),
             'database.py': self.env.get_template('database.py.jinja').render(db_name=db_path),
             'models.py': self.env.get_template('models.py.jinja').render(tables=schema),
             'routers/__init__.py': '',
@@ -152,4 +75,21 @@ async def delete_{{ table.name | lower }}(item_id: int):
             router_file = f"routers/{table['name'].lower()}.py"
             generated_files[router_file] = self.env.get_template('router.py.jinja').render(table=table)
 
+        # Apply additional formatting to each file
+        for filename, content in generated_files.items():
+            generated_files[filename] = self.format_code(content)
+
         return generated_files
+
+    def format_code(self, code):
+        # Remove multiple consecutive blank lines
+        #code = re.sub(r'\n\s*\n', '\n\n', code)
+        
+        # Ensure each class definition is preceded by a blank line
+        #code = re.sub(r'(\nclass)', r'\n\1', code)
+        
+        # Fix inline field definitions
+        #code = re.sub(r'(\w+:\s*\w+)\s+', r'\1\n    ', code)
+        
+        # Ensure there's exactly one newline at the end
+        return code

@@ -27,8 +27,12 @@ class MainWindow(QWidget):
         db_layout.addWidget(self.browse_button)
         scroll_layout.addLayout(db_layout)
 
+        button_layout = QHBoxLayout()
         self.generate_button = QPushButton("Generate")
-        scroll_layout.addWidget(self.generate_button)
+        button_layout.addWidget(self.generate_button)
+        self.save_button = QPushButton("Save")
+        button_layout.addWidget(self.save_button)
+        scroll_layout.addLayout(button_layout)
 
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
@@ -44,3 +48,6 @@ class MainWindow(QWidget):
 
     def set_output_text(self, text):
         self.output_text.setPlainText(text)
+
+    def get_output_text(self):
+        return self.output_text.toPlainText()
