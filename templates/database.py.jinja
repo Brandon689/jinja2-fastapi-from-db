@@ -30,3 +30,12 @@ def execute_update_delete(query: str, params: tuple = ()) -> int:
     conn.commit()
     conn.close()
     return affected_rows
+
+def execute_fts_query(table: str, query: str) -> List[Dict[str, Any]]:
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT * FROM {table} WHERE {table} MATCH ?", (query,))
+    result = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return result
