@@ -8,19 +8,18 @@ class {{ table.name | capitalize }}Search(BaseModel):
     query: str
 
 class {{ table.name | capitalize }}Result(BaseModel):
-    # Add fields that you expect in the search result
-    # For example:
-    id: int
-    title: Optional[str] = None
-    content: Optional[str] = None
-    # Add more fields as needed
+    docid: int
+    {% for column in table.columns %}
+    {{ column.name }}: {% if column.nullable %}Optional[{{ column.py_type }}]{% else %}{{ column.py_type }}{% endif %}{% if column.nullable %} = None{% endif %}
+    {% endfor %}
+    snippet: Optional[str] = None
 
 {% else %}
 class {{ table.name | capitalize }}Base(BaseModel):
-    {% for column in table.columns %}
-    {% if column.name != table.primary_key %}
+    {% for column in table.columns -%}
+    {% if column.name != table.primary_key -%}
     {{ column.name }}: {% if column.nullable %}Optional[{{ column.py_type }}]{% else %}{{ column.py_type }}{% endif %}{% if column.nullable %} = None{% endif %}
-    {% endif %}
+    {% endif -%}
     {% endfor %}
 
 class {{ table.name | capitalize }}Create({{ table.name | capitalize }}Base):
