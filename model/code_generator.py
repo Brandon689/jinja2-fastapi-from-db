@@ -16,7 +16,7 @@ class CodeGenerator:
         schema = []
         for table in tables:
             table_name = table[0]
-            if table_name == 'sqlite_sequence':
+            if table_name == 'sqlite_sequence' or table_name.endswith('_fts'):
                 continue  # Skip this system table
             
             cursor.execute(f"PRAGMA table_info({table_name})")
@@ -47,16 +47,20 @@ class CodeGenerator:
 
     def map_sqlite_to_python_type(self, sqlite_type, col_name):
         sqlite_type = sqlite_type.lower()
-        if 'int' in sqlite_type:
+        if sqlite_type == '':
+            return 'str'
+        elif 'int' in sqlite_type:
             return 'bool' if col_name.lower() in ['isadmin', 'is_admin'] else 'int'
         elif 'char' in sqlite_type or 'clob' in sqlite_type or 'text' in sqlite_type:
-            return 'datetime' if 'date' in col_name.lower() or 'time' in col_name.lower() else 'str'
+            return 'str'
         elif 'real' in sqlite_type or 'floa' in sqlite_type or 'doub' in sqlite_type:
             return 'float'
         elif 'blob' in sqlite_type:
             return 'bytes'
         elif 'boolean' in sqlite_type:
             return 'bool'
+        elif 'date' in sqlite_type or 'time' in sqlite_type:
+            return 'datetime'
         else:
             print(f"Unknown SQLite type: {sqlite_type}")
             return 'Any'
@@ -77,19 +81,6 @@ class CodeGenerator:
 
         # Apply additional formatting to each file
         for filename, content in generated_files.items():
-            generated_files[filename] = self.format_code(content)
+            generated_files[filename] = content
 
         return generated_files
-
-    def format_code(self, code):
-        # Remove multiple consecutive blank lines
-        #code = re.sub(r'\n\s*\n', '\n\n', code)
-        
-        # Ensure each class definition is preceded by a blank line
-        #code = re.sub(r'(\nclass)', r'\n\1', code)
-        
-        # Fix inline field definitions
-        #code = re.sub(r'(\w+:\s*\w+)\s+', r'\1\n    ', code)
-        
-        # Ensure there's exactly one newline at the end
-        return code
